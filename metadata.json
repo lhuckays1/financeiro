@@ -1,0 +1,6 @@
+{
+  "name": "Sistema Financeiro",
+  "description": "Gestão Financeira Pessoal - Controle simples de ganhos e gastos",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
