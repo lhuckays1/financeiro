@@ -8,6 +8,7 @@ import {
   getStoredCategories,
 } from '../lib/supabase';
 import { toast } from 'sonner';
+import { initializeUser } from "../services/profile.service";
 
 export function checkIsAdmin(authUser: AuthUser | null): boolean {
   if (!authUser) return false;
@@ -49,32 +50,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (isSupabaseConfigured && supabase) {
       const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+
+      const loadUser = async () => {
+
         if (session?.user) {
+
+          await initializeUser(session.user);
+
           setUser({
             id: session.user.id,
             email: session.user.email || '',
             user_metadata: session.user.user_metadata,
             created_at: session.user.created_at,
           });
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
-      });
 
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session?.user) {
-          setUser({
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            user_metadata: data.session.user.user_metadata,
-            created_at: data.session.user.created_at,
-          });
         } else {
           setUser(null);
         }
+
         setLoading(false);
-      });
+
+      };
+
+      loadUser();
+
+    });
+
+      supabase.auth.getSession().then(async ({ data }) => {
+
+      if (data.session?.user) {
+
+        await initializeUser(data.session.user);
+
+        setUser({
+          id: data.session.user.id,
+          email: data.session.user.email || '',
+          user_metadata: data.session.user.user_metadata,
+          created_at: data.session.user.created_at,
+        });
+
+      } else {
+        setUser(null);
+      }
+
+      setLoading(false);
+
+    });
 
       return () => {
         sub.subscription.unsubscribe();
