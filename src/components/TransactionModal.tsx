@@ -94,6 +94,16 @@ export const TransactionModal: React.FC = () => {
 
     const selectedCategoryName = category || (type === 'ganho' ? 'Outros' : 'Outros');
 
+    if (accounts.length === 0) {
+      alert("Cadastre uma conta antes de criar um lançamento.");
+      return;
+    }
+
+    if (!accountId) {
+      alert("Selecione uma conta.");
+      return;
+    }
+
     if (editingTransaction) {
       await updateTxMutation.mutateAsync({
         ...editingTransaction,
