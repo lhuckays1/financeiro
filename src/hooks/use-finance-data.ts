@@ -20,28 +20,13 @@ export function useCategories(userId?: string) {
 
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .order('name');
+          .from("categories")
+          .select("*")
+          .eq("user_id", userId)
+          .order("name");
         if (error) {
           console.error('Error loading categories from Supabase:', error);
           return getStoredCategories(userId);
-        }
-        if (data && data.length === 0) {
-          // Seed default categories into Supabase for this user
-          const defaultCatsToInsert = DEFAULT_CATEGORIES.map((c) => ({
-            user_id: userId,
-            name: c.name,
-            type: c.type,
-            color: c.color,
-          }));
-          const { data: seeded, error: seedErr } = await supabase
-            .from('categories')
-            .insert(defaultCatsToInsert)
-            .select();
-          if (!seedErr && seeded && seeded.length > 0) {
-            return seeded as Category[];
-          }
         }
         return data as Category[];
       } else {
@@ -107,9 +92,10 @@ export function useTransactions(userId?: string) {
 
       if (isSupabaseConfigured && supabase) {
         const { data, error } = await supabase
-          .from('transactions')
-          .select('*')
-          .order('date', { ascending: false });
+          .from("transactions")
+          .select("*")
+          .eq("user_id", userId)
+          .order("date", { ascending: false });
         if (error) {
           console.error('Error loading transactions from Supabase:', error);
           return getStoredTransactions(userId);
@@ -193,7 +179,8 @@ export function useUpdateTransaction(userId?: string) {
             account_id: tx.account_id,
             date: tx.date,
           })
-          .eq('id', tx.id)
+          .eq("id", tx.id)
+          .eq("user_id", userId)
           .select()
           .single();
 
@@ -224,7 +211,7 @@ export function useDeleteTransaction(userId?: string) {
       if (!userId) throw new Error('Usuário não autenticado');
 
       if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from('transactions').delete().eq('id', id);
+        const { error } = await supabase.from('transactions').delete().eq('id', id).eq("user_id", userId);
         if (error) throw error;
         return id;
       } else {
