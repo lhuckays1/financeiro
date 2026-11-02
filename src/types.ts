@@ -108,3 +108,35 @@ export interface Account {
   updated_at?: string;
 }
 
+export interface CreditCard {
+  id: string;
+  user_id: string;
+  name: string;
+  limit_amount: number;
+  closing_day: number;
+  due_day: number;
+  color: string;
+  created_at?: string;
+}
+
+export type PayableStatus = 'pending' | 'paid';
+
+export interface Payable {
+  id: string;
+  user_id: string;
+  title: string;
+  amount: number;
+  category: string;
+  due_date: string;
+  purchase_date: string;
+  status: PayableStatus;
+  paid_at?: string | null;
+  payment_account_id?: string | null;
+  card_id?: string | null;
+  purchase_group?: string | null;
+  installment_number?: number | null;
+  installment_count?: number | null;
+  created_at?: string;
+}
+
+
