@@ -19,8 +19,10 @@ export async function initializeUser(user: AuthIdentity): Promise<string> {
 
   const { data: existingProfile, error: profileLookupError } = await neon
     .from('profiles')
-    .select('id,email,full_name')
+    .select('id,email,full_name,created_at')
     .eq('email', email)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle();
 
   if (profileLookupError) throw profileLookupError;
@@ -81,3 +83,4 @@ export async function initializeUser(user: AuthIdentity): Promise<string> {
 
   return profileId;
 }
+
