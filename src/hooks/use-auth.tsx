@@ -213,22 +213,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           provider: 'google',
           options: {
             redirectTo: window.location.origin,
-            skipBrowserRedirect: true,
           },
         });
-
-        if (!error && data?.url) {
-          const popup = window.open(data.url, '_blank');
-          if (popup) {
-            toast.info('Janela do Google aberta. Conclua o acesso na nova aba.');
-            return;
-          }
-        }
+        if (error) throw error;
+        if (!data?.url) throw new Error('O Neon não retornou a URL de autenticação.');
       } catch (err: any) {
         toast.error(`Falha ao iniciar login com Google: ${err?.message || 'provedor indisponível'}`);
         return;
       }
-      toast.error('Login com Google não foi iniciado. Confira a configuração OAuth do Neon.');
       return;
     }
 
@@ -283,3 +275,4 @@ export function useAuth() {
   }
   return context;
 }
+
