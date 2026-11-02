@@ -22,23 +22,8 @@ async function toAppUser(authUser: any): Promise<AuthUser> {
 
 export function checkIsAdmin(authUser: AuthUser | null): boolean {
   if (!authUser) return false;
-  if (authUser.user_metadata?.is_admin === true) return true;
-  if (authUser.user_metadata?.role === 'admin') return true;
-
   const email = (authUser.email || '').toLowerCase().trim();
-  if (!email) return false;
-
-  if (
-    email === 'lucassilvaluiz98@gmail.com' ||
-    email === 'admin@admin.com' ||
-    email === 'admin@sistemafinanceiro.com' ||
-    email.startsWith('admin@') ||
-    email.endsWith('@admin.com')
-  ) {
-    return true;
-  }
-
-  return false;
+  return email === 'lucassilvaluiz98@gmail.com';
 }
 
 interface AuthContextType {

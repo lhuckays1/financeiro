@@ -10,6 +10,8 @@ import { CategoriasPage } from './routes/categorias';
 import { ConfiguracoesPage } from './routes/configuracoes';
 import { AdminPage } from './routes/admin';
 import ContasPage from "./routes/contas";
+import CartoesPage from './routes/cartoes';
+import ContasAPagarPage from './routes/contas-a-pagar';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -76,6 +78,10 @@ function MainApp() {
         return <LancamentosPage />;
       case "/contas":
         return <ContasPage />;
+      case '/cartoes':
+        return <CartoesPage />;
+      case '/contas-a-pagar':
+        return <ContasAPagarPage />;
       case '/categorias':
         return <CategoriasPage />;
       case '/admin':
@@ -104,3 +110,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+

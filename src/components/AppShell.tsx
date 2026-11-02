@@ -11,6 +11,8 @@ import {
   Plus,
   LogOut,
   ShieldAlert,
+  CreditCard,
+  CalendarClock,
 } from 'lucide-react';
 import { useThemeStore } from '../store/theme-store';
 import { useTransactionModalStore } from '../store/transaction-modal-store';
@@ -28,6 +30,8 @@ const NAV_ITEMS = [
   { path: '/lancamentos', label: 'Lançamentos', icon: Receipt },
   { path: '/categorias', label: 'Categorias', icon: Grid },
   { path: '/contas', label: 'Contas', icon: Landmark },
+  { path: '/contas-a-pagar', label: 'Contas a pagar', icon: CalendarClock },
+  { path: '/cartoes', label: 'Cartões', icon: CreditCard },
   { path: '/admin', label: 'Área ADM', icon: ShieldAlert, badge: 'SaaS' },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
@@ -238,4 +242,5 @@ export const AppShell: React.FC<AppShellProps> = ({ currentPath, onNavigate, chi
     </div>
   );
 };
+
 
