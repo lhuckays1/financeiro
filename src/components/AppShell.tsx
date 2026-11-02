@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Wallet,
   Landmark,
@@ -13,6 +13,8 @@ import {
   ShieldAlert,
   CreditCard,
   CalendarClock,
+  MoreHorizontal,
+  X,
 } from 'lucide-react';
 import { useThemeStore } from '../store/theme-store';
 import { useTransactionModalStore } from '../store/transaction-modal-store';
@@ -36,10 +38,23 @@ const NAV_ITEMS = [
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
+const MOBILE_PRIMARY_PATHS = new Set(['/dashboard', '/lancamentos', '/contas-a-pagar']);
+const MOBILE_LABELS: Record<string, string> = {
+  '/dashboard': 'Início',
+  '/lancamentos': 'Lançamentos',
+  '/contas-a-pagar': 'A pagar',
+  '/categorias': 'Categorias',
+  '/contas': 'Contas',
+  '/cartoes': 'Cartões',
+  '/admin': 'Administração',
+  '/configuracoes': 'Ajustes',
+};
+
 export const AppShell: React.FC<AppShellProps> = ({ currentPath, onNavigate, children }) => {
   const { theme, toggleTheme } = useThemeStore();
   const { openModal } = useTransactionModalStore();
   const { user, signOut, isAdmin } = useAuth();
+  const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.path === '/admin') {
@@ -202,8 +217,23 @@ export const AppShell: React.FC<AppShellProps> = ({ currentPath, onNavigate, chi
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-30 px-2 py-1.5 flex items-center justify-around shadow-lg">
-        {visibleNavItems.map((item) => {
+      {isMobileMoreOpen && <button type="button" aria-label="Fechar menu de navegação" onClick={() => setIsMobileMoreOpen(false)} className="md:hidden fixed inset-0 z-40 bg-black/35" />}
+      <nav aria-label="Navegação principal" className="md:hidden fixed bottom-0 inset-x-0 bg-card border-t border-border z-50 px-2 pt-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] shadow-lg">
+        {isMobileMoreOpen && <div id="mobile-more-menu" className="absolute bottom-full left-3 right-3 mb-2 rounded-2xl border border-border bg-card p-3 shadow-2xl">
+          <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Mais opções</p>
+          <div className="grid grid-cols-3 gap-2">
+            {visibleNavItems.filter((item) => !MOBILE_PRIMARY_PATHS.has(item.path)).map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPath === item.path;
+              return <button key={item.path} type="button" onClick={() => { setIsMobileMoreOpen(false); onNavigate(item.path); }} className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl px-1 py-2 text-center transition-colors ${isActive ? 'bg-primary/15 text-primary' : 'text-muted-foreground hover:bg-accent'}`}>
+                <Icon className="h-5 w-5" />
+                <span className="text-[11px] font-medium leading-tight">{MOBILE_LABELS[item.path] ?? item.label}</span>
+              </button>;
+            })}
+          </div>
+        </div>}
+        <div className="grid grid-cols-4 items-center">
+        {visibleNavItems.filter((item) => MOBILE_PRIMARY_PATHS.has(item.path)).map((item) => {
           const Icon = item.icon;
           const isActive = currentPath === item.path;
           return (
@@ -212,15 +242,20 @@ export const AppShell: React.FC<AppShellProps> = ({ currentPath, onNavigate, chi
               id={`mobile-nav-${item.path.replace('/', '')}`}
               type="button"
               onClick={() => onNavigate(item.path)}
-              className={`flex flex-col items-center gap-1 p-2 rounded-md transition-colors ${
+              className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition-colors ${
                 isActive ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-[10px] font-medium">{item.label}</span>
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="truncate text-[10px] font-medium leading-tight">{MOBILE_LABELS[item.path] ?? item.label}</span>
             </button>
           );
         })}
+        <button type="button" aria-controls="mobile-more-menu" aria-expanded={isMobileMoreOpen} onClick={() => setIsMobileMoreOpen((open) => !open)} className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition-colors ${isMobileMoreOpen || !MOBILE_PRIMARY_PATHS.has(currentPath) ? 'text-primary' : 'text-muted-foreground'}`}>
+          {isMobileMoreOpen ? <X className="h-5 w-5 shrink-0" /> : <MoreHorizontal className="h-5 w-5 shrink-0" />}
+          <span className="text-[10px] font-medium leading-tight">Mais</span>
+        </button>
+        </div>
       </nav>
 
       {/* Floating Action Button (FAB) */}
@@ -228,7 +263,7 @@ export const AppShell: React.FC<AppShellProps> = ({ currentPath, onNavigate, chi
         id="fab-new-transaction-btn"
         type="button"
         onClick={() => openModal(null, 'gasto')}
-        className="fixed bottom-20 md:bottom-8 right-5 md:right-8 z-40 p-4 rounded-full bg-primary text-primary-foreground shadow-xl hover:opacity-95 hover:scale-105 active:scale-95 transition-all flex items-center justify-center group"
+        className={`fixed bottom-20 md:bottom-8 right-5 md:right-8 z-40 p-4 rounded-full bg-primary text-primary-foreground shadow-xl hover:opacity-95 hover:scale-105 active:scale-95 transition-all items-center justify-center group ${isMobileMoreOpen ? 'hidden md:flex' : 'flex'}`}
         title="Novo Lançamento (Atalho: Pressione 'N')"
       >
         <Plus className="w-6 h-6 stroke-[2.5]" />
