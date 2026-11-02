@@ -44,6 +44,47 @@ export function useCreateCreditCard(userId?: string) {
   });
 }
 
+export function useUpdateCreditCard(userId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (card: CreditCard) => {
+      if (!userId || !neon) throw new Error('Conecte-se para editar cartões.');
+      const { data, error } = await neon.from('credit_cards').update({
+        name: card.name,
+        limit_amount: card.limit_amount,
+        closing_day: card.closing_day,
+        due_day: card.due_day,
+        color: card.color,
+      }).eq('id', card.id).eq('user_id', userId).select().single();
+      if (error) throw error;
+      return data as CreditCard;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards', userId] });
+      toast.success('Cartão atualizado.');
+    },
+    onError: (error: Error) => toast.error(`Não foi possível editar o cartão: ${error.message}`),
+  });
+}
+
+export function useDeleteCreditCard(userId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (cardId: string) => {
+      if (!userId || !neon) throw new Error('Conecte-se para excluir cartões.');
+      const { error } = await neon.from('credit_cards').delete().eq('id', cardId).eq('user_id', userId);
+      if (error) throw error;
+      return cardId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cards', userId] });
+      queryClient.invalidateQueries({ queryKey: ['payables', userId] });
+      toast.success('Cartão excluído. As obrigações já lançadas foram preservadas.');
+    },
+    onError: (error: Error) => toast.error(`Não foi possível excluir o cartão: ${error.message}`),
+  });
+}
+
 export function useCreatePayable(userId?: string) {
   const queryClient = useQueryClient();
   return useMutation({
