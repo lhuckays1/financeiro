@@ -1,14 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Category, Transaction } from '../types';
 import {
-  supabase,
-  isSupabaseConfigured,
+  neon,
+  isNeonConfigured,
   DEFAULT_CATEGORIES,
   getStoredCategories,
   saveStoredCategories,
   getStoredTransactions,
   saveStoredTransactions,
-} from '../lib/supabase';
+} from '../lib/neon';
 import { toast } from 'sonner';
 
 // Categories hooks
@@ -18,14 +18,14 @@ export function useCategories(userId?: string) {
     queryFn: async (): Promise<Category[]> => {
       if (!userId) return [];
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
           .from("categories")
           .select("*")
           .eq("user_id", userId)
           .order("name");
         if (error) {
-          console.error('Error loading categories from Supabase:', error);
+          console.error('Error loading categories from Neon:', error);
           return getStoredCategories(userId);
         }
         return data as Category[];
@@ -44,8 +44,8 @@ export function useAddCategory(userId?: string) {
     mutationFn: async (newCat: Omit<Category, 'id' | 'user_id' | 'created_at'>) => {
       if (!userId) throw new Error('Usuário não autenticado');
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
           .from('categories')
           .insert({
             user_id: userId,
@@ -90,14 +90,14 @@ export function useTransactions(userId?: string) {
     queryFn: async (): Promise<Transaction[]> => {
       if (!userId) return [];
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
           .from("transactions")
           .select("*")
           .eq("user_id", userId)
           .order("date", { ascending: false });
         if (error) {
-          console.error('Error loading transactions from Supabase:', error);
+          console.error('Error loading transactions from Neon:', error);
           return getStoredTransactions(userId);
         }
         return data as Transaction[];
@@ -116,8 +116,8 @@ export function useAddTransaction(userId?: string) {
     mutationFn: async (newTx: Omit<Transaction, 'id' | 'user_id' | 'created_at'>) => {
       if (!userId) throw new Error('Usuário não autenticado');
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
           .from('transactions')
           .insert({
               user_id: userId,
@@ -168,8 +168,8 @@ export function useUpdateTransaction(userId?: string) {
     mutationFn: async (tx: Transaction) => {
       if (!userId) throw new Error('Usuário não autenticado');
 
-      if (isSupabaseConfigured && supabase) {
-        const { data, error } = await supabase
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
           .from('transactions')
           .update({
             type: tx.type,
@@ -210,8 +210,8 @@ export function useDeleteTransaction(userId?: string) {
     mutationFn: async (id: string) => {
       if (!userId) throw new Error('Usuário não autenticado');
 
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from('transactions').delete().eq('id', id).eq("user_id", userId);
+      if (isNeonConfigured && neon) {
+        const { error } = await neon.from('transactions').delete().eq('id', id).eq("user_id", userId);
         if (error) throw error;
         return id;
       } else {
@@ -242,9 +242,9 @@ export function useUpdateCategory(userId?: string) {
         throw new Error("Usuário não autenticado");
       }
 
-      if (isSupabaseConfigured && supabase) {
+      if (isNeonConfigured && neon) {
 
-        const { data, error } = await supabase
+        const { data, error } = await neon
           .from("categories")
           .update({
             name: category.name,
@@ -259,7 +259,7 @@ export function useUpdateCategory(userId?: string) {
         if (error) throw error;
 
         // Atualiza todas as transações que usam a categoria antiga
-        const { error: txError } = await supabase
+        const { error: txError } = await neon
           .from("transactions")
           .update({
             category: category.name,
@@ -352,9 +352,9 @@ export function useDeleteCategory(userId?: string) {
       } = params;
 
       // Verifica se existem lançamentos utilizando esta categoria
-      const transactions = isSupabaseConfigured && supabase
+      const transactions = isNeonConfigured && neon
         ? (
-            await supabase
+            await neon
               .from("transactions")
               .select("id")
               .eq("user_id", userId)
@@ -370,11 +370,11 @@ export function useDeleteCategory(userId?: string) {
         );
       }
 
-      if (isSupabaseConfigured && supabase) {
+      if (isNeonConfigured && neon) {
 
         if (moveTo) {
 
-          const { error: txError } = await supabase
+          const { error: txError } = await neon
             .from("transactions")
             .update({
               category: moveTo,
@@ -386,7 +386,7 @@ export function useDeleteCategory(userId?: string) {
             throw txError;
         }
 
-        const { error } = await supabase
+        const { error } = await neon
           .from("categories")
           .delete()
           .eq("id", categoryId)

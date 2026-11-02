@@ -5,7 +5,7 @@ import { usePeriodStore } from '../store/period-store';
 import { useAuth } from '../hooks/use-auth';
 import { useCategories, useAddCategory, useTransactions, useUpdateCategory, useDeleteCategory } from '../hooks/use-finance-data';
 import { formatBRL } from '../lib/format';
-import { TransactionType } from '../types';
+import { Category, TransactionType } from '../types';
 import { CategoryCard } from "../components/CategoryCard";
 import { CategoryModal } from "../components/CategoryModal";
 import { DeleteCategoryDialog } from "../components/DeleteCategoryDialog";

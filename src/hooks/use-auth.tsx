@@ -1,14 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { AuthUser } from '../types';
 import {
-  supabase,
-  isSupabaseConfigured,
+  neon,
+  isNeonConfigured,
   getDemoUser,
   setDemoUser,
   getStoredCategories,
-} from '../lib/supabase';
+} from '../lib/neon';
 import { toast } from 'sonner';
 import { initializeUser } from "../services/profile.service";
+
+async function toAppUser(authUser: any): Promise<AuthUser> {
+  const id = await initializeUser(authUser);
+  return {
+    id,
+    email: authUser.email || '',
+    user_metadata: authUser.user_metadata ?? {},
+    created_at: authUser.created_at,
+  };
+}
 
 export function checkIsAdmin(authUser: AuthUser | null): boolean {
   if (!authUser) return false;
@@ -36,7 +46,8 @@ interface AuthContextType {
   isAdmin: boolean;
   loading: boolean;
   signInWithEmail: (email: string, pass: string) => Promise<boolean>;
-  signUpWithEmail: (email: string, pass: string) => Promise<{ success: boolean; loggedIn: boolean }>;
+  signUpWithEmail: (email: string, pass: string) => Promise<{ success: boolean; loggedIn: boolean; requiresVerification?: boolean }>;
+  verifyEmailOtp: (email: string, token: string) => Promise<boolean>;
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
 }
@@ -48,54 +59,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (isSupabaseConfigured && supabase) {
-      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    if (isNeonConfigured && neon) {
+      const { data: sub } = neon.auth.onAuthStateChange((_event, session) => {
+        void (async () => {
+          try {
+            setUser(session?.user ? await toAppUser(session.user) : null);
+          } catch (err: any) {
+            setUser(null);
+            toast.error(`Não foi possível carregar seu perfil: ${err?.message || 'erro de conexão'}`);
+          } finally {
+            setLoading(false);
+          }
+        })();
+      });
 
-      const loadUser = async () => {
-
-        if (session?.user) {
-
-          await initializeUser(session.user);
-
-          setUser({
-            id: session.user.id,
-            email: session.user.email || '',
-            user_metadata: session.user.user_metadata,
-            created_at: session.user.created_at,
-          });
-
-        } else {
+      void neon.auth.getSession().then(async ({ data }) => {
+        try {
+          setUser(data.session?.user ? await toAppUser(data.session.user) : null);
+        } catch (err: any) {
           setUser(null);
+          toast.error(`Não foi possível carregar seu perfil: ${err?.message || 'erro de conexão'}`);
+        } finally {
+          setLoading(false);
         }
-
-        setLoading(false);
-
-      };
-
-      loadUser();
-
-    });
-
-      supabase.auth.getSession().then(async ({ data }) => {
-
-      if (data.session?.user) {
-
-        await initializeUser(data.session.user);
-
-        setUser({
-          id: data.session.user.id,
-          email: data.session.user.email || '',
-          user_metadata: data.session.user.user_metadata,
-          created_at: data.session.user.created_at,
-        });
-
-      } else {
+      }).catch((err: any) => {
         setUser(null);
-      }
-
-      setLoading(false);
-
-    });
+        setLoading(false);
+        toast.error(`Falha ao recuperar a sessão: ${err?.message || 'erro de conexão'}`);
+      });
 
       return () => {
         sub.subscription.unsubscribe();
@@ -112,9 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithEmail = async (email: string, pass: string) => {
-    if (isSupabaseConfigured && supabase) {
+    if (isNeonConfigured && neon) {
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await neon.auth.signInWithPassword({
           email,
           password: pass,
         });
@@ -123,12 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (data.session?.user) {
-          setUser({
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            user_metadata: data.session.user.user_metadata,
-            created_at: data.session.user.created_at,
-          });
+          setUser(await toAppUser(data.session.user));
         }
         toast.success('Login realizado com sucesso!');
         return true;
@@ -155,9 +141,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, pass: string) => {
-    if (isSupabaseConfigured && supabase) {
+    if (isNeonConfigured && neon) {
       try {
-        const { data, error } = await supabase.auth.signUp({
+        const { data, error } = await neon.auth.signUp({
           email,
           password: pass,
           options: {
@@ -173,40 +159,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (data.session?.user) {
-          setUser({
-            id: data.session.user.id,
-            email: data.session.user.email || '',
-            user_metadata: data.session.user.user_metadata,
-            created_at: data.session.user.created_at,
-          });
+          setUser(await toAppUser(data.session.user));
           toast.success('Conta criada e logada com sucesso!');
           return { success: true, loggedIn: true };
         }
-
-        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-          email,
-          password: pass,
-        });
-
-        if (!signInErr && signInData.session?.user) {
-          setUser({
-            id: signInData.session.user.id,
-            email: signInData.session.user.email || '',
-            user_metadata: signInData.session.user.user_metadata,
-            created_at: signInData.session.user.created_at,
-          });
-          toast.success('Conta criada com sucesso!');
-          return { success: true, loggedIn: true };
-        }
-
         if (data.user) {
-          toast.info('Conta cadastrada com sucesso! Faça login com seu e-mail e senha.');
-          return { success: true, loggedIn: false };
+          toast.info('Conta criada. Informe o código enviado por e-mail para confirmar sua identidade.');
+          return { success: true, loggedIn: false, requiresVerification: true };
         }
 
         return { success: true, loggedIn: false };
       } catch (err: any) {
-        toast.error(`Erro no cadastro: ${err?.message || 'Falha ao comunicar com Supabase'}`);
+        toast.error(`Erro no cadastro: ${err?.message || 'Falha ao comunicar com Neon'}`);
         return { success: false, loggedIn: false };
       }
     } else {
@@ -227,10 +191,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const verifyEmailOtp = async (email: string, token: string) => {
+    if (!neon) return false;
+    try {
+      const { data, error } = await neon.auth.verifyOtp({ email, token, type: 'signup' });
+      if (error) throw error;
+      if (!data.session?.user) throw new Error('A confirmação não iniciou uma sessão. Tente entrar novamente.');
+      setUser(await toAppUser(data.session.user));
+      toast.success('E-mail confirmado. Bem-vindo!');
+      return true;
+    } catch (err: any) {
+      toast.error(`Não foi possível confirmar o e-mail: ${err?.message || 'código inválido'}`);
+      return false;
+    }
+  };
+
   const signInWithGoogle = async () => {
-    if (isSupabaseConfigured && supabase) {
+    if (isNeonConfigured && neon) {
       try {
-        const { data, error } = await supabase.auth.signInWithOAuth({
+        const { data, error } = await neon.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: window.location.origin,
@@ -245,9 +224,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return;
           }
         }
-      } catch {
-        // Fallback if popup blocked or Google OAuth disabled
+      } catch (err: any) {
+        toast.error(`Falha ao iniciar login com Google: ${err?.message || 'provedor indisponível'}`);
+        return;
       }
+      toast.error('Login com Google não foi iniciado. Confira a configuração OAuth do Neon.');
+      return;
     }
 
     const googleUser: AuthUser = {
@@ -267,8 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    if (isNeonConfigured && neon) {
+      await neon.auth.signOut();
     }
     setDemoUser(null);
     setUser(null);
@@ -284,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         signInWithEmail,
         signUpWithEmail,
+        verifyEmailOtp,
         signInWithGoogle,
         signOut,
       }}

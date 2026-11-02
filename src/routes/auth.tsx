@@ -7,14 +7,23 @@ interface AuthPageProps {
 }
 
 export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
-  const [tab, setTab] = useState<'login' | 'signup'>('login');
+  const { signInWithEmail, signUpWithEmail, verifyEmailOtp, signInWithGoogle } = useAuth();
+  const [tab, setTab] = useState<'login' | 'signup' | 'verify'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (tab === 'verify') {
+      if (!email || !verificationCode) return;
+      setLoading(true);
+      const verified = await verifyEmailOtp(email, verificationCode.trim());
+      setLoading(false);
+      if (verified) onSuccess();
+      return;
+    }
     if (!email || !password) return;
 
     if (password.length < 6) {
@@ -35,6 +44,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
       if (res.success) {
         if (res.loggedIn) {
           onSuccess();
+        } else if (res.requiresVerification) {
+          setTab('verify');
         } else {
           // Switch to login tab so user can log in with created credentials
           setTab('login');
@@ -67,7 +78,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
         </div>
 
         {/* Auth Tabs */}
-        <div className="grid grid-cols-2 p-1 bg-background border border-border rounded-md">
+        {tab !== 'verify' ? <div className="grid grid-cols-2 p-1 bg-background border border-border rounded-md">
           <button
             id="auth-tab-login"
             type="button"
@@ -92,11 +103,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
           >
             Cadastrar
           </button>
-        </div>
+        </div> : <p className="text-sm text-center text-muted-foreground">Confirme o e-mail <strong>{email}</strong> com o código recebido.</p>}
 
         {/* Email & Password Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          {tab !== 'verify' ? <><div>
             <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">
               E-mail
             </label>
@@ -131,7 +142,19 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
                 className="w-full pl-9 pr-3 py-2.5 rounded-md bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
               />
             </div>
-          </div>
+          </div></> : <div>
+            <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">Código de confirmação</label>
+            <input
+              id="auth-verification-code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              required
+              className="w-full px-3 py-2.5 rounded-md bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+          </div>}
 
           <button
             id="auth-submit-btn"
@@ -139,21 +162,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
             disabled={loading}
             className="w-full py-2.5 px-4 rounded-md bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
           >
-            <span>{loading ? 'Aguarde...' : tab === 'login' ? 'Entrar' : 'Criar Conta'}</span>
+            <span>{loading ? 'Aguarde...' : tab === 'verify' ? 'Confirmar e-mail' : tab === 'login' ? 'Entrar' : 'Criar Conta'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
         {/* Divider */}
-        <div className="relative flex items-center justify-center my-4">
+        {tab !== 'verify' && <div className="relative flex items-center justify-center my-4">
           <div className="border-t border-border w-full"></div>
           <span className="bg-card px-3 text-xs text-muted-foreground uppercase font-medium absolute">
             ou
           </span>
-        </div>
+        </div>}
 
         {/* Google OAuth Official Button */}
-        <button
+        {tab !== 'verify' && <button
           id="auth-google-btn"
           type="button"
           onClick={handleGoogleAuth}
@@ -179,7 +202,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
             />
           </svg>
           <span>Continuar com Google</span>
-        </button>
+        </button>}
       </div>
     </div>
   );

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
-import { useTransactionModalStore } from '../store/transaction-modal-store';
-import { useAuth } from '../hooks/use-auth';
-import { useCategories, useAddTransaction, useUpdateTransaction, useDeleteTransaction } from '../hooks/use-finance-data';
-import { useAccounts } from "../hooks/useAccounts";
-import { maskCurrencyInput, parseCurrencyToNumber, formatBRL, formatInputDate } from '../lib/format';
-import { TransactionType } from '../types';
+import { useTransactionModalStore } from './store/transaction-modal-store';
+import { useAuth } from './hooks/use-auth';
+import { useCategories, useAddTransaction, useUpdateTransaction, useDeleteTransaction } from './hooks/use-finance-data';
+import { useAccounts } from "./hooks/useAccounts";
+import { maskCurrencyInput, parseCurrencyToNumber, formatBRL, formatInputDate } from './lib/format';
+import { TransactionType } from './types';
 
 export const TransactionModal: React.FC = () => {
   const { isOpen, editingTransaction, defaultType, closeModal } = useTransactionModalStore();
