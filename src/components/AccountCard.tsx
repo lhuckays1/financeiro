@@ -16,6 +16,8 @@ interface Props {
   onEdit: (account: Account) => void;
 
   onDelete: (account: Account) => void;
+
+  canEdit?: boolean;
 }
 
 export const AccountCard: React.FC<Props> = ({
@@ -23,6 +25,7 @@ export const AccountCard: React.FC<Props> = ({
   balance,
   onEdit,
   onDelete,
+  canEdit = true,
 }) => {
   return (
     <div className="rounded-lg border border-border bg-card p-4 shadow-sm hover:shadow-md transition-all">
@@ -58,6 +61,8 @@ export const AccountCard: React.FC<Props> = ({
 
           <button
             onClick={() => onEdit(account)}
+            disabled={!canEdit}
+            title={canEdit ? "Editar conta" : "Aguarde os lançamentos carregarem para editar o saldo com precisão"}
             className="p-2 rounded hover:bg-accent"
           >
             <Pencil size={17} />
@@ -93,3 +98,4 @@ export const AccountCard: React.FC<Props> = ({
     </div>
   );
 };
+
