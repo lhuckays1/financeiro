@@ -25,7 +25,7 @@ export const ContasPage: React.FC = () => {
   const { data: accounts = [], isLoading } =
     useAccounts(user?.id);
 
-  const { data: transactions = [] } =
+  const { data: transactions = [], isLoading: transactionsLoading, isError: transactionsError, refetch: refetchTransactions } =
     useTransactions(user?.id);
 
   const addAccountMutation =
@@ -84,6 +84,18 @@ export const ContasPage: React.FC = () => {
 
     return map;
 
+  }, [accounts, transactions]);
+
+  const accountActivity = useMemo(() => {
+    const map = new Map<string, number>();
+    accounts.forEach((account) => map.set(account.id, 0));
+    transactions.forEach((transaction) => {
+      if (!transaction.account_id || !map.has(transaction.account_id)) return;
+      const amount = Number(transaction.amount);
+      const activity = transaction.type === "ganho" ? amount : -amount;
+      map.set(transaction.account_id, (map.get(transaction.account_id) ?? 0) + activity);
+    });
+    return map;
   }, [accounts, transactions]);
 
   const handleCreate = () => {
@@ -165,7 +177,7 @@ export const ContasPage: React.FC = () => {
 
     };
 
-  if (isLoading) {
+  if (isLoading || transactionsLoading) {
 
     return (
 
@@ -173,7 +185,7 @@ export const ContasPage: React.FC = () => {
 
         <p className="text-muted-foreground">
 
-          Carregando contas...
+          Carregando contas e lançamentos...
 
         </p>
 
@@ -218,6 +230,15 @@ export const ContasPage: React.FC = () => {
 
       </div>
 
+      {transactionsError && (
+        <div role="alert" className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm">
+          <span>Não foi possível carregar os lançamentos usados no cálculo dos saldos. Tente atualizar antes de editar uma conta.</span>
+          <button type="button" onClick={() => void refetchTransactions()} className="shrink-0 rounded border border-border px-3 py-1.5 font-medium hover:bg-accent">
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       {accounts.length === 0 ? (
 
         <div className="rounded-xl border border-dashed border-border p-10 text-center">
@@ -252,6 +273,7 @@ export const ContasPage: React.FC = () => {
               }
               onEdit={handleEdit}
               onDelete={handleDelete}
+              canEdit={!transactionsError}
             />
 
           ))}
@@ -262,6 +284,9 @@ export const ContasPage: React.FC = () => {
             <AccountModal
         open={modalOpen}
         account={editingAccount}
+        currentBalance={editingAccount ? accountBalances.get(editingAccount.id) : undefined}
+        balanceActivity={editingAccount ? accountActivity.get(editingAccount.id) : 0}
+        saving={addAccountMutation.isPending || updateAccountMutation.isPending}
         accounts={accounts}
         onClose={() => {
           setModalOpen(false);
@@ -286,3 +311,4 @@ export const ContasPage: React.FC = () => {
 };
 
 export default ContasPage;
+
