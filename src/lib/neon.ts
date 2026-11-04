@@ -11,7 +11,15 @@ export const isNeonConfigured = Boolean(neonAuthUrl && neonDataApiUrl);
 export const neon = isNeonConfigured
   ? createClient({
       auth: {
-        adapter: SupabaseAuthAdapter(),
+        adapter: SupabaseAuthAdapter({
+          // Keep active mobile sessions fresh; focus/online refresh is also
+          // enabled by Neon Auth. The server still controls absolute expiry.
+          sessionOptions: {
+            refetchInterval: 60 * 60 * 12,
+            refetchOnWindowFocus: true,
+            refetchWhenOffline: false,
+          },
+        }),
         url: neonAuthUrl,
       },
       dataApi: {
@@ -98,3 +106,4 @@ export const saveStoredTransactions = (userId: string, transactions: Transaction
 };
 
 export { getDemoUser, setDemoUser };
+
