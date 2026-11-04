@@ -33,6 +33,12 @@ interface Props {
 
   accounts: Account[];
 
+  currentBalance?: number;
+
+  balanceActivity?: number;
+
+  saving?: boolean;
+
   onClose: () => void;
 
   onSave: (
@@ -47,6 +53,9 @@ export const AccountModal: React.FC<Props> = ({
   open,
   account,
   accounts,
+  currentBalance,
+  balanceActivity = 0,
+  saving = false,
   onClose,
   onSave,
 }) => {
@@ -66,14 +75,14 @@ export const AccountModal: React.FC<Props> = ({
       setName(account.name);
       setType(account.type);
       setColor(account.color);
-      setInitialBalance(account.initial_balance);
+      setInitialBalance(currentBalance ?? account.initial_balance);
     } else {
       setName("");
       setType("Conta Corrente");
       setColor("#6366F1");
       setInitialBalance(0);
     }
-  }, [account, open]);
+  }, [account?.id, open]);
 
   if (!open) return null;
 
@@ -104,16 +113,29 @@ export const AccountModal: React.FC<Props> = ({
       return;
     }
 
-    await onSave({
-      user_id: account?.user_id || "",
-      name: normalized,
-      type,
-      color,
-      initial_balance: Number(initialBalance),
-      is_active: true,
-    });
+    try {
+      const enteredBalance = Number(initialBalance);
+      if (!Number.isFinite(enteredBalance)) {
+        alert("Informe um saldo válido.");
+        return;
+      }
 
-    onClose();
+      await onSave({
+        user_id: account?.user_id || "",
+        name: normalized,
+        type,
+        color,
+        // On edit, preserve existing ledger entries and adjust only the base
+        // balance so the displayed current balance matches the entered value.
+        initial_balance: account ? enteredBalance - balanceActivity : enteredBalance,
+        is_active: true,
+      });
+
+      onClose();
+    } catch {
+      // The mutation displays the server error. Keep the dialog open so the
+      // user can correct the value or retry without losing their input.
+    }
   };
 
   return (
@@ -196,13 +218,14 @@ export const AccountModal: React.FC<Props> = ({
 
             <label className="text-sm font-medium">
 
-              Saldo Inicial
+              {account ? "Saldo Atual desejado" : "Saldo Inicial"}
 
             </label>
 
             <input
               type="number"
               step="0.01"
+              inputMode="decimal"
               value={initialBalance}
               onChange={(e) =>
                 setInitialBalance(
@@ -211,6 +234,11 @@ export const AccountModal: React.FC<Props> = ({
               }
               className="mt-1 w-full rounded border border-border bg-background px-3 py-2"
             />
+            {account && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Os lançamentos existentes serão mantidos; este valor ajusta o saldo atual da conta.
+              </p>
+            )}
 
           </div>
 
@@ -260,11 +288,12 @@ export const AccountModal: React.FC<Props> = ({
 
             <button
               type="submit"
+              disabled={saving}
               className="px-5 py-2 rounded bg-primary text-primary-foreground flex items-center gap-2"
             >
               <Save size={16} />
 
-              {account
+              {saving ? "Salvando..." : account
                 ? "Salvar"
                 : "Criar Conta"}
 
@@ -279,3 +308,4 @@ export const AccountModal: React.FC<Props> = ({
     </div>
   );
 };
+
