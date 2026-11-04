@@ -3,7 +3,6 @@ import { Category, Transaction } from '../types';
 import {
   neon,
   isNeonConfigured,
-  DEFAULT_CATEGORIES,
   getStoredCategories,
   saveStoredCategories,
   getStoredTransactions,
@@ -24,10 +23,7 @@ export function useCategories(userId?: string) {
           .select("*")
           .eq("user_id", userId)
           .order("name");
-        if (error) {
-          console.error('Error loading categories from Neon:', error);
-          return getStoredCategories(userId);
-        }
+        if (error) throw error;
         return data as Category[];
       } else {
         return getStoredCategories(userId);
@@ -73,8 +69,8 @@ export function useAddCategory(userId?: string) {
         return created;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['categories', userId] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['categories', userId] });
       toast.success('Categoria adicionada!');
     },
     onError: (err: Error) => {
@@ -96,10 +92,7 @@ export function useTransactions(userId?: string) {
           .select("*")
           .eq("user_id", userId)
           .order("date", { ascending: false });
-        if (error) {
-          console.error('Error loading transactions from Neon:', error);
-          return getStoredTransactions(userId);
-        }
+        if (error) throw error;
         return data as Transaction[];
       } else {
         return getStoredTransactions(userId);
@@ -151,8 +144,11 @@ export function useAddTransaction(userId?: string) {
         return created;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts', userId] }),
+      ]);
       toast.success('Lançamento registrado com sucesso!');
     },
     onError: (err: Error) => {
@@ -193,8 +189,11 @@ export function useUpdateTransaction(userId?: string) {
         return tx;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts', userId] }),
+      ]);
       toast.success('Lançamento atualizado!');
     },
     onError: (err: Error) => {
@@ -221,8 +220,11 @@ export function useDeleteTransaction(userId?: string) {
         return id;
       }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', userId] });
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['transactions', userId] }),
+        queryClient.invalidateQueries({ queryKey: ['accounts', userId] }),
+      ]);
       toast.success('Lançamento excluído.');
     },
     onError: (err: Error) => {
@@ -304,20 +306,27 @@ export function useUpdateCategory(userId?: string) {
       return category;
     },
 
-    onSuccess: () => {
-      queryClient.invalidateQueries({
+    onSuccess: async () => {
+      await Promise.all([queryClient.invalidateQueries({
         queryKey: ["categories"],
-      });
+      }),
 
       queryClient.invalidateQueries({
         queryKey: ["transactions"],
-      });
+      })]);
 
       toast.success("Categoria atualizada.");
     },
 
     onError(error: any) {
       toast.error(error.message);
+    },
+
+    async onSettled() {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["categories", userId] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions", userId] }),
+      ]);
     },
   });
 }
@@ -352,17 +361,20 @@ export function useDeleteCategory(userId?: string) {
       } = params;
 
       // Verifica se existem lançamentos utilizando esta categoria
-      const transactions = isNeonConfigured && neon
-        ? (
-            await neon
-              .from("transactions")
-              .select("id")
-              .eq("user_id", userId)
-              .eq("category", categoryName)
-          ).data ?? []
-        : getStoredTransactions(userId).filter(
-            t => t.category === categoryName
-          );
+      let transactions: Array<{ id: string }>;
+      if (isNeonConfigured && neon) {
+        const { data, error } = await neon
+          .from("transactions")
+          .select("id")
+          .eq("user_id", userId)
+          .eq("category", categoryName);
+        if (error) throw error;
+        transactions = (data ?? []) as Array<{ id: string }>;
+      } else {
+        transactions = getStoredTransactions(userId).filter(
+          t => t.category === categoryName
+        );
+      }
 
       if (transactions.length > 0 && !moveTo) {
         throw new Error(
@@ -438,23 +450,17 @@ export function useDeleteCategory(userId?: string) {
     },
 
     onSuccess() {
-
-      queryClient.invalidateQueries({
-
-        queryKey: ["categories"],
-
-      });
-
-      queryClient.invalidateQueries({
-
-        queryKey: ["transactions"],
-
-      });
-
       toast.success(
         "Categoria excluída."
       );
 
+    },
+
+    async onSettled() {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["categories", userId] }),
+        queryClient.invalidateQueries({ queryKey: ["transactions", userId] }),
+      ]);
     },
 
     onError(error: any) {
@@ -466,3 +472,4 @@ export function useDeleteCategory(userId?: string) {
   });
 
 }
+

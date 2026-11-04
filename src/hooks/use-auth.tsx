@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { AuthUser } from '../types';
 import {
   neon,
@@ -33,7 +33,7 @@ interface AuthContextType {
   signInWithEmail: (email: string, pass: string) => Promise<boolean>;
   signUpWithEmail: (email: string, pass: string) => Promise<{ success: boolean; loggedIn: boolean; requiresVerification?: boolean }>;
   verifyEmailOtp: (email: string, token: string) => Promise<boolean>;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: () => Promise<boolean>;
   signOut: () => Promise<void>;
 }
 
@@ -42,38 +42,63 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const authRevision = useRef(0);
+  const profileRequests = useRef(new Map<string, Promise<AuthUser>>());
+
+  const resolveAppUser = (authUser: any) => {
+    const existing = profileRequests.current.get(authUser.id);
+    if (existing) return existing;
+
+    const request = toAppUser(authUser).catch((error) => {
+      profileRequests.current.delete(authUser.id);
+      throw error;
+    });
+    profileRequests.current.set(authUser.id, request);
+    return request;
+  };
 
   useEffect(() => {
     if (isNeonConfigured && neon) {
-      const { data: sub } = neon.auth.onAuthStateChange((_event, session) => {
-        void (async () => {
-          try {
-            setUser(session?.user ? await toAppUser(session.user) : null);
-          } catch (err: any) {
-            setUser(null);
-            toast.error(`Não foi possível carregar seu perfil: ${err?.message || 'erro de conexão'}`);
-          } finally {
-            setLoading(false);
+      let active = true;
+      const applySession = async (session: any, revision: number) => {
+        if (!session?.user) {
+          if (active && revision === authRevision.current) setUser(null);
+          if (active && revision === authRevision.current) setLoading(false);
+          return;
+        }
+
+        try {
+          const appUser = await resolveAppUser(session.user);
+          if (active && revision === authRevision.current) setUser(appUser);
+        } catch (err: any) {
+          // A temporary profile/Data API failure must not destroy a valid auth session.
+          if (active && revision === authRevision.current) {
+            toast.error(`Sessão ativa, mas não foi possível carregar os dados: ${err?.message || 'erro de conexão'}`);
           }
-        })();
+        } finally {
+          if (active && revision === authRevision.current) setLoading(false);
+        }
+      };
+
+      const { data: sub } = neon.auth.onAuthStateChange((_event, session) => {
+        const revision = ++authRevision.current;
+        void applySession(session, revision);
       });
 
+      const initialRevision = authRevision.current;
       void neon.auth.getSession().then(async ({ data }) => {
-        try {
-          setUser(data.session?.user ? await toAppUser(data.session.user) : null);
-        } catch (err: any) {
-          setUser(null);
-          toast.error(`Não foi possível carregar seu perfil: ${err?.message || 'erro de conexão'}`);
-        } finally {
-          setLoading(false);
-        }
+        // Ignore a possibly older initial read when an auth event arrived meanwhile.
+        if (initialRevision !== authRevision.current) return;
+        await applySession(data.session, initialRevision);
       }).catch((err: any) => {
-        setUser(null);
+        if (!active || initialRevision !== authRevision.current) return;
+        // Do not clear an already restored session on a transient network failure.
         setLoading(false);
         toast.error(`Falha ao recuperar a sessão: ${err?.message || 'erro de conexão'}`);
       });
 
       return () => {
+        active = false;
         sub.subscription.unsubscribe();
       };
     } else {
@@ -99,7 +124,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return false;
         }
         if (data.session?.user) {
-          setUser(await toAppUser(data.session.user));
+          setUser(await resolveAppUser(data.session.user));
         }
         toast.success('Login realizado com sucesso!');
         return true;
@@ -144,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (data.session?.user) {
-          setUser(await toAppUser(data.session.user));
+          setUser(await resolveAppUser(data.session.user));
           toast.success('Conta criada e logada com sucesso!');
           return { success: true, loggedIn: true };
         }
@@ -182,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await neon.auth.verifyOtp({ email, token, type: 'signup' });
       if (error) throw error;
       if (!data.session?.user) throw new Error('A confirmação não iniciou uma sessão. Tente entrar novamente.');
-      setUser(await toAppUser(data.session.user));
+      setUser(await resolveAppUser(data.session.user));
       toast.success('E-mail confirmado. Bem-vindo!');
       return true;
     } catch (err: any) {
@@ -191,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (): Promise<boolean> => {
     if (isNeonConfigured && neon) {
       try {
         const { data, error } = await neon.auth.signInWithOAuth({
@@ -202,11 +227,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         if (error) throw error;
         if (!data?.url) throw new Error('O Neon não retornou a URL de autenticação.');
+        // Neon Auth owns the OAuth redirect and callback. Do not navigate away
+        // from this page while it is starting the browser redirect.
+        return true;
       } catch (err: any) {
         toast.error(`Falha ao iniciar login com Google: ${err?.message || 'provedor indisponível'}`);
-        return;
+        return false;
       }
-      return;
     }
 
     const googleUser: AuthUser = {
@@ -223,11 +250,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(googleUser);
     getStoredCategories(googleUser.id);
     toast.success('Login via Google realizado com sucesso!');
+    return true;
   };
 
   const signOut = async () => {
     if (isNeonConfigured && neon) {
-      await neon.auth.signOut();
+      try {
+        const { error } = await neon.auth.signOut();
+        if (error) throw error;
+      } catch (err: any) {
+        toast.error(`Não foi possível sair da conta: ${err?.message || 'erro de conexão'}`);
+        return;
+      }
     }
     setDemoUser(null);
     setUser(null);

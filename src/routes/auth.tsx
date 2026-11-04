@@ -56,9 +56,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
 
   const handleGoogleAuth = async () => {
     setLoading(true);
-    await signInWithGoogle();
-    setLoading(false);
-    onSuccess();
+    const started = await signInWithGoogle();
+    // A successful OAuth start navigates through Neon Auth and returns to the
+    // app with a restored session. Navigating here races that redirect.
+    if (!started) setLoading(false);
   };
 
   return (
@@ -207,3 +208,4 @@ export const AuthPage: React.FC<AuthPageProps> = ({ onSuccess }) => {
     </div>
   );
 };
+

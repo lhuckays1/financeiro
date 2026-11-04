@@ -23,8 +23,8 @@ export function useAddAccount() {
   return useMutation({
     mutationFn: createAccount,
 
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (_, variables) => {
+      await queryClient.invalidateQueries({
         queryKey: ["accounts", variables.user_id],
       });
 
@@ -43,8 +43,8 @@ export function useUpdateAccount() {
   return useMutation({
     mutationFn: updateAccount,
 
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({
+    onSuccess: async (data) => {
+      await queryClient.invalidateQueries({
         queryKey: ["accounts", data.user_id],
       });
 
@@ -63,8 +63,8 @@ export function useDeleteAccount(userId: string) {
   return useMutation({
     mutationFn: (id: string) => deleteAccount(id, userId),
 
-    onSuccess: () => {
-      queryClient.invalidateQueries({
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
         queryKey: ["accounts", userId],
       });
 
@@ -76,3 +76,4 @@ export function useDeleteAccount(userId: string) {
     },
   });
 }
+

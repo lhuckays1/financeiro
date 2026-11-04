@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Toaster } from 'sonner';
+import { QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast, Toaster } from 'sonner';
 import { AuthProvider, useAuth } from './hooks/use-auth';
 import { AppShell } from './components/AppShell';
 import { AuthPage } from './routes/auth';
@@ -14,10 +14,20 @@ import CartoesPage from './routes/cartoes';
 import ContasAPagarPage from './routes/contas-a-pagar';
 
 const queryClient = new QueryClient({
+  queryCache: new QueryCache({
+    onError: (error) => {
+      console.error('Falha ao atualizar dados financeiros:', error);
+      // Mutations already show their own messages. This reports failed reads,
+      // which used to be hidden behind stale demo data.
+      toast.error(`Não foi possível atualizar os dados: ${error.message || 'verifique sua conexão e tente novamente.'}`);
+    },
+  }),
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      staleTime: 0,
+      retry: 1,
     },
   },
 });
@@ -61,12 +71,7 @@ function MainApp() {
 
   // Auth Guard
   if (!user) {
-    return (
-      <QueryClientProvider client={queryClient}>
-        <Toaster position="top-right" richColors />
-        <AuthPage onSuccess={() => navigate('/dashboard')} />
-      </QueryClientProvider>
-    );
+    return <AuthPage onSuccess={() => navigate('/dashboard')} />;
   }
 
   // Render main app with router
@@ -94,20 +99,20 @@ function MainApp() {
   };
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <Toaster position="top-right" richColors />
-      <AppShell currentPath={currentPath} onNavigate={navigate}>
-        {renderRoute()}
-      </AppShell>
-    </QueryClientProvider>
+    <AppShell currentPath={currentPath} onNavigate={navigate}>
+      {renderRoute()}
+    </AppShell>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainApp />
-    </AuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Toaster position="top-right" richColors />
+        <MainApp />
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
