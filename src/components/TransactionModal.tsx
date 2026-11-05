@@ -11,7 +11,12 @@ export const TransactionModal: React.FC = () => {
   const { isOpen, editingTransaction, defaultType, closeModal } = useTransactionModalStore();
   const { user } = useAuth();
   const { data: categories = [] } = useCategories(user?.id);
-  const { data: accounts = [] } = useAccounts(user?.id);
+  const {
+    data: accounts = [],
+    isLoading: accountsLoading,
+    isError: accountsError,
+    refetch: refetchAccounts,
+  } = useAccounts(user?.id);
 
   const addTxMutation = useAddTransaction(user?.id);
   const updateTxMutation = useUpdateTransaction(user?.id);
@@ -24,6 +29,12 @@ export const TransactionModal: React.FC = () => {
   const [accountId, setAccountId] = useState("");
   const [date, setDate] = useState(formatInputDate(new Date()));
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && user?.id) {
+      void refetchAccounts();
+    }
+  }, [isOpen, user?.id, refetchAccounts]);
 
   useEffect(() => {
     setConfirmDelete(false);
@@ -235,10 +246,14 @@ export const TransactionModal: React.FC = () => {
               value={accountId}
               onChange={(e) => setAccountId(e.target.value)}
               required
-              disabled={accounts.length === 0}
+              disabled={accountsLoading || accountsError || accounts.length === 0}
               className="w-full px-3 py-2.5 rounded-md bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             >
-              {accounts.length === 0 ? (
+              {accountsLoading ? (
+                <option value="">Carregando contas...</option>
+              ) : accountsError ? (
+                <option value="">Não foi possível carregar as contas</option>
+              ) : accounts.length === 0 ? (
                 <option value="">
                   Nenhuma conta cadastrada
                 </option>
@@ -250,6 +265,18 @@ export const TransactionModal: React.FC = () => {
                 ))
               )}
             </select>
+            {accountsError && (
+              <div className="mt-2 flex items-center justify-between gap-2 text-xs text-destructive">
+                <span>Verifique sua conexão e tente novamente.</span>
+                <button
+                  type="button"
+                  onClick={() => void refetchAccounts()}
+                  className="font-semibold underline underline-offset-2"
+                >
+                  Tentar novamente
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Categoria & Data Grid */}
@@ -339,7 +366,7 @@ export const TransactionModal: React.FC = () => {
               <button
                 id="save-transaction-modal-btn"
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || accountsLoading || accountsError || accounts.length === 0}
                 className={`px-5 py-2.5 rounded-md text-sm font-bold transition-all shadow-md ${
                   type === 'ganho'
                     ? 'bg-success text-success-foreground hover:opacity-90'
