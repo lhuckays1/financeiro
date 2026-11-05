@@ -27,14 +27,40 @@ export async function initializeUser(user: AuthIdentity): Promise<string> {
 
   if (profileLookupError) throw profileLookupError;
 
-  const profileId = existingProfile?.id ?? user.id;
+  let profileId = existingProfile?.id ?? user.id;
   if (!existingProfile) {
-    const { error } = await neon.from('profiles').insert({
+    const { error } = await neon.from('profiles').upsert({
       id: profileId,
       email,
       full_name: String(user.user_metadata?.full_name ?? user.user_metadata?.name ?? email.split('@')[0]),
-    });
-    if (error) throw error;
+    }, { onConflict: 'id', ignoreDuplicates: true });
+
+    if (error) {
+      // Another tab/device may have created the email profile after our lookup.
+      // Re-read it and continue with its existing ID rather than failing login.
+      const { data: concurrentProfile, error: retryError } = await neon
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (retryError) throw error;
+      if (!concurrentProfile) throw error;
+      profileId = concurrentProfile.id;
+    } else {
+      // An email conflict can cause the insert to be ignored, so resolve the
+      // canonical profile ID before initializing dependent records.
+      const { data: canonicalProfile, error: canonicalError } = await neon
+        .from('profiles')
+        .select('id')
+        .eq('email', email)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (canonicalError) throw canonicalError;
+      if (canonicalProfile) profileId = canonicalProfile.id;
+    }
   }
 
   const { data: accounts, error: accountLookupError } = await neon
@@ -52,7 +78,7 @@ export async function initializeUser(user: AuthIdentity): Promise<string> {
       initial_balance: 0,
       color: '#2563eb',
     });
-    if (error) throw error;
+    if (error && error.code !== '23505') throw error;
   }
 
   const { data: categories, error: categoryLookupError } = await neon
@@ -78,9 +104,8 @@ export async function initializeUser(user: AuthIdentity): Promise<string> {
     const { error } = await neon.from('categories').insert(
       defaults.map((category) => ({ user_id: profileId, ...category })),
     );
-    if (error) throw error;
+    if (error && error.code !== '23505') throw error;
   }
 
   return profileId;
 }
-
